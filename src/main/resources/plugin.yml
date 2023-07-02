@@ -1,0 +1,8 @@
+name: CVDungeonGenerator
+main: org.cubeville.cvdungeongenerator.CVDungeonGenerator
+authors: [ Ptown16 ]
+version: 1.18
+depend: [ CVGames ]
+api-version: 1.18
+
+commands:
