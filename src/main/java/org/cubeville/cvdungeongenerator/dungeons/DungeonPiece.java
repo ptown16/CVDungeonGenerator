@@ -14,17 +14,33 @@ import com.sk89q.worldedit.math.transform.AffineTransform;
 import com.sk89q.worldedit.regions.CuboidRegion;
 import com.sk89q.worldedit.session.ClipboardHolder;
 import org.bukkit.Location;
+import org.cubeville.cvgames.enums.CardinalDirection;
 import org.cubeville.cvgames.models.GameRegion;
 
+import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class DungeonPiece {
 
-    Clipboard clipboard;
-    GameRegion gameRegion;
+    private final String name;
+    private final Clipboard clipboard;
+    private final GameRegion gameRegion;
+    private List<DungeonExit> exits = new ArrayList<>();
 
-    public DungeonPiece(GameRegion gameRegion) {
+    private final GameRegion entranceRegion;
+    private final CardinalDirection entranceDirection;
+
+    public DungeonPiece(String name, GameRegion gameRegion) {
+        this(name, gameRegion, null, null);
+    }
+
+    public DungeonPiece(String name, GameRegion gameRegion, @Nullable GameRegion entranceRegion, @Nullable CardinalDirection entranceDirection) {
+        this.name = name;
         this.gameRegion = gameRegion;
+        this.entranceRegion = entranceRegion;
+        this.entranceDirection = entranceDirection;
         Location min = gameRegion.getMin();
         Location max = gameRegion.getMax();
         CuboidRegion region = new CuboidRegion(BlockVector3.at(min.getX(), min.getY(), min.getZ()), BlockVector3.at(max.getX(), max.getY(), max.getZ()));
@@ -59,6 +75,10 @@ public class DungeonPiece {
         }
     }
 
+    public void paste(DungeonExitInstance dei) {
+        // my brain is melting please help
+    }
+
     public int getXSize() {
         return gameRegion.getMax().getBlockX() - gameRegion.getMin().getBlockX();
     }
@@ -75,4 +95,24 @@ public class DungeonPiece {
 
     public Location getMax() { return gameRegion.getMax(); }
 
+    public List<DungeonExit> getExits() {
+        return exits;
+    }
+
+    public void setExits(List<DungeonExit> exits) {
+        exits.forEach(exit -> exit.setRelativePosition(gameRegion));
+        this.exits = exits;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public GameRegion getEntranceRegion() {
+        return entranceRegion;
+    }
+
+    public CardinalDirection getEntranceDirection() {
+        return entranceDirection;
+    }
 }
