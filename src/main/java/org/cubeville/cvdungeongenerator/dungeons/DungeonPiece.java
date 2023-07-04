@@ -70,4 +70,9 @@ public class DungeonPiece {
     public int getZSize() {
         return gameRegion.getMax().getBlockZ() - gameRegion.getMin().getBlockZ();
     }
+
+    public Location getMin() { return gameRegion.getMin(); }
+
+    public Location getMax() { return gameRegion.getMax(); }
+
 }

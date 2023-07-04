@@ -20,7 +20,7 @@
     <dependency>
       <groupId>com.github.ptown16</groupId>
       <artifactId>CVGames</artifactId>
-      <version>b8bcf30c17</version>
+      <version>613dfc22be</version>
     </dependency>
     <dependency>
       <groupId>com.sk89q.worldedit</groupId>
