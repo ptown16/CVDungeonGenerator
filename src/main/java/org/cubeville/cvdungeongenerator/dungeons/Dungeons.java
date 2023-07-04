@@ -47,10 +47,9 @@ public class Dungeons extends SoloGame {
     public void onGameStart(Player player) {
         this.player = player;
         state.put(player, new DungeonState());
-        Block block = (Block) getVariable("paste-block");
-        Location blockLocation = block.getLocation().clone();
-        // First, take all the variables coming in and process them so we can easily calculate info using them.
+        // First, take all the variables coming in and process them, so we can easily calculate info using them.
         processDungeonPieces();
+        generateDungeon();
     }
 
     private void processDungeonPieces() {
@@ -86,7 +85,7 @@ public class Dungeons extends SoloGame {
         Block block = (Block) getVariable("paste-block");
         Location blockLocation = block.getLocation().clone();
         for (DungeonExit exit : nameToExits.get("start-region")) {
-            currentExits.add(new DungeonExitInstance(exit, exit.getDirection()));
+            currentExits.add(new DungeonExitInstance(exit, new PasteAt(blockLocation, 0)));
         }
         startPiece.paste(blockLocation);
         startGenerateCountdownTask(blockLocation.add(startLocationOffset));
@@ -114,7 +113,10 @@ public class Dungeons extends SoloGame {
         while (maxPieceGeneration > 0 && currentExits.size() > 0) {
             // Let's use a breadth first search rn
             DungeonExitInstance exitInstance = currentExits.poll();
-
+            DungeonPiece piece = dungeonPieces.get(0);
+            PasteAt pa = dungeonPieces.get(0).paste(exitInstance);
+            currentExits.addAll(piece.createExitInstances(pa));
+            maxPieceGeneration--;
         }
     }
 

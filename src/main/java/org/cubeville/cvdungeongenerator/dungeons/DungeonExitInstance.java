@@ -1,24 +1,31 @@
 package org.cubeville.cvdungeongenerator.dungeons;
 
 import org.bukkit.Location;
+import org.bukkit.util.Vector;
 import org.cubeville.cvgames.enums.CardinalDirection;
 
 public class DungeonExitInstance {
 
     private final DungeonExit dungeonExit;
-    private final CardinalDirection directionPlaced;
-    private Location min, max;
+    private final int pieceRotationPasted;
+    private final CardinalDirection direction;
+    private final Location min;
 
-    DungeonExitInstance(DungeonExit dungeonExit, CardinalDirection directionPlaced, Location locationPasted) {
+    DungeonExitInstance(DungeonExit dungeonExit, PasteAt pasteAt) {
         this.dungeonExit = dungeonExit;
-        this.directionPlaced = directionPlaced;
+        this.pieceRotationPasted = pasteAt.rotation;
+
+        Vector rotatedRelativeMin = RotationUtils.getRotatedRelativeMin(dungeonExit.getRelativeMin(), dungeonExit.getRelativeMax(), pieceRotationPasted);
+
+        this.direction = RotationUtils.applyRotationToCardinalDirection(dungeonExit.getDirection(), pieceRotationPasted);
+        this.min = pasteAt.location.clone().add(rotatedRelativeMin);
     }
 
-    public CardinalDirection nextPasteDirection(CardinalDirection newAttemptedDirection) {
-        return CardinalDirectionMap.combineRotations(directionPlaced, newAttemptedDirection);
+    public Location getMin() {
+        return min;
     }
 
-    public DungeonExit getDungeonExit() {
-        return dungeonExit;
+    public CardinalDirection getDirection() {
+        return direction;
     }
 }
