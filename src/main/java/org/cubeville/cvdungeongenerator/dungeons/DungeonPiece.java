@@ -34,9 +34,6 @@ public class DungeonPiece {
     private final CardinalDirection entranceDirection;
     private final Vector relativeEntranceMin, relativeEntranceMax;
 
-
-    private final HashMap<Integer, Vector> rotationToRelativeAxis = new HashMap<>();
-
     public DungeonPiece(String name, GameRegion gameRegion) {
         this(name, gameRegion, null, null);
     }
@@ -47,7 +44,7 @@ public class DungeonPiece {
         Location min = pieceRegion.getMin();
         Location max = pieceRegion.getMax();
         this.relativeEntranceMin = entranceRegion != null ? entranceRegion.getMin().toVector().subtract(min.toVector()) : null;
-        this.relativeEntranceMax = entranceRegion != null ? entranceRegion.getMax().toVector().subtract(max.toVector()) : null;
+        this.relativeEntranceMax = entranceRegion != null ? entranceRegion.getMax().toVector().subtract(min.toVector()) : null;
         this.entranceDirection = entranceDirection;
         CuboidRegion region = new CuboidRegion(BlockVector3.at(min.getX(), min.getY(), min.getZ()), BlockVector3.at(max.getX(), max.getY(), max.getZ()));
         clipboard = new BlockArrayClipboard(region);
@@ -59,16 +56,6 @@ public class DungeonPiece {
         } catch (WorldEditException e) {
             e.printStackTrace();
         }
-
-        for (int i = 0; i < 360; i += 90) {
-            Vector v;
-            if (i % 180 == 90) {
-                v = new Vector(getZSize(), 0, getXSize());
-            } else {
-                v = new Vector(getXSize(), 0, getZSize());
-            }
-            rotationToRelativeAxis.put(i, v.multiply(RotationUtils.getRotationVector(i)));
-        }
     }
 
     public void paste(Location location) {
@@ -76,10 +63,11 @@ public class DungeonPiece {
     }
 
     public void paste(Location location, int rotation) {
+        System.out.println("pasting at " + location + " with rotation " + rotation);
         try (EditSession editSession = WorldEdit.getInstance().newEditSession(BukkitAdapter.adapt(Objects.requireNonNull(location.getWorld())))) {
             ClipboardHolder holder = new ClipboardHolder(clipboard);
             AffineTransform transform = new AffineTransform();
-            transform = transform.rotateY(rotation);
+            transform = transform.rotateY(-1 * rotation);
             holder.setTransform(transform);
             Operation operation = holder
                     .createPaste(editSession)
@@ -98,7 +86,14 @@ public class DungeonPiece {
         // Find what rotation this piece should be
         int pieceRotation = RotationUtils.getRotationFrom(entranceDirection, dei.getDirection());
         Vector rotatedRelativeMin = RotationUtils.getRotatedRelativeMin(relativeEntranceMin, relativeEntranceMax, pieceRotation);
+        System.out.println("start paste loc " + pasteLocation);
+        System.out.println("rel ent min " + relativeEntranceMin);
+        System.out.println("rel ent max " + relativeEntranceMax);
+        System.out.println("rot rel min " + rotatedRelativeMin);
+        System.out.println("rot " + pieceRotation);
+
         pasteLocation.subtract(rotatedRelativeMin);
+        paste(pasteLocation, pieceRotation);
         return new PasteAt(pasteLocation, pieceRotation);
     }
 
@@ -133,5 +128,9 @@ public class DungeonPiece {
 
     public String getName() {
         return name;
+    }
+
+    public GameRegion getPieceRegion() {
+        return pieceRegion;
     }
 }

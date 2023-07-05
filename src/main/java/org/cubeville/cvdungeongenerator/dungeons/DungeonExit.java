@@ -21,9 +21,6 @@ public class DungeonExit {
     public void setRelativePosition(GameRegion pieceRegion) {
         relativeMin = region.getMin().toVector().subtract(pieceRegion.getMin().toVector());
         relativeMax = region.getMax().toVector().subtract(pieceRegion.getMin().toVector());
-        int xSize = pieceRegion.getMax().getBlockX() - pieceRegion.getMin().getBlockX();
-        int zSize = pieceRegion.getMax().getBlockZ() - pieceRegion.getMin().getBlockZ();
-
     }
 
     public CardinalDirection getDirection() {

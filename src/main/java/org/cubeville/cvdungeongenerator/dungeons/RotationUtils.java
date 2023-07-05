@@ -19,16 +19,21 @@ public class RotationUtils {
 
     private static final CardinalDirection[] integerToDirection = {CardinalDirection.NORTH, CardinalDirection.EAST, CardinalDirection.SOUTH, CardinalDirection.WEST};
 
-    private static final Map<Integer, Vector> rotationVectors = Map.of(
-            0, new Vector(0, 0, 0),
-            90, new Vector(1, 0, 0),
-            180, new Vector(1, 0, 1),
-            270, new Vector(0, 0, 1)
+    private static final Map<CardinalDirection, Integer> reverseDirectionToInteger = Map.of(
+            CardinalDirection.NORTH, 3,
+            CardinalDirection.EAST, 2,
+            CardinalDirection.SOUTH, 1,
+            CardinalDirection.WEST, 0
     );
 
-    public static Vector getRotationVector(int rotation) {
-        return rotationVectors.get(rotation);
-    }
+    private static final CardinalDirection[] integerToReverseDirection = {CardinalDirection.WEST, CardinalDirection.SOUTH, CardinalDirection.EAST, CardinalDirection.NORTH};
+
+    private static final Map<Integer, Vector> rotationVectors = Map.of(
+            0, new Vector(1, 1, 1),
+            90, new Vector(-1, 1, 1),
+            180, new Vector(-1, 1, -1),
+            270, new Vector(1, 1, -1)
+    );
 
     public static Vector getExitDirectionOffset(CardinalDirection direction) {
         switch (direction) {
@@ -66,13 +71,13 @@ public class RotationUtils {
         Vector swappedMin, swappedMax;
         // at 90 or 270, swap the X and Z values
         if (rotation % 180 == 0) {
-            swappedMin = min;
-            swappedMax = max;
+            swappedMin = min.clone();
+            swappedMax = max.clone();
         } else {
             swappedMin = new Vector(min.getZ(), min.getY(), min.getX());
             swappedMax = new Vector(max.getZ(), max.getY(), max.getX());
         }
-        Vector adjustmentVector = getRotationVector(rotation).multiply(-1);
+        Vector adjustmentVector = rotationVectors.get(rotation);
         Vector rotatedRelativeMin = swappedMin.multiply(adjustmentVector);
         Vector rotatedRelativeMax = swappedMax.multiply(adjustmentVector);
 

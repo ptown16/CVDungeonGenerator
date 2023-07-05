@@ -1,7 +1,16 @@
 package org.cubeville.cvdungeongenerator.dungeons;
 
+import com.sk89q.worldedit.MaxChangedBlocksException;
+import com.sk89q.worldedit.WorldEdit;
+import com.sk89q.worldedit.bukkit.BukkitAdapter;
+import com.sk89q.worldedit.math.BlockVector3;
+import com.sk89q.worldedit.regions.CuboidRegion;
+import com.sk89q.worldedit.world.World;
+import com.sk89q.worldedit.world.block.BlockState;
+import com.sk89q.worldedit.EditSession;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.cubeville.cvdungeongenerator.CVDungeonGenerator;
@@ -16,12 +25,13 @@ import java.util.*;
 public class Dungeons extends SoloGame {
 
     private int generationCountdownTask = -1;
-    private int maxPieceGeneration = 4;
-
+    private int maxPieceGeneration;
+    Random rand = new Random();
     private Player player;
+    private GameRegion dungeonRegion;
     private List<DungeonPiece> dungeonPieces = new ArrayList<>();
     private List<DungeonPiece> deadEnds = new ArrayList<>();
-    private Queue<DungeonExitInstance> currentExits = new PriorityQueue<>();
+    private Queue<DungeonExitInstance> currentExits = new LinkedList<>();
 
     public Dungeons(String id, String arenaName) {
         super(id, arenaName);
@@ -29,6 +39,7 @@ public class Dungeons extends SoloGame {
         addGameVariable("start-location", new GameVariableLocation("The location a player starts at (please set this location on the start piece)"));
         addGameVariable("paste-block", new GameVariableBlock("Places you can exit a dungeon piece from"));
         addGameVariable("dungeon-region", new GameVariableRegion("The region that dungeon generation can happen in"));
+        addGameVariable("piece-generation", new GameVariableInt("The number of pieces generated before it caps the rest of them off with dead ends"));
         addGameVariableObjectList("dungeon-pieces", new HashMap(){{
             put("name", new GameVariableString("The name of the dungeon piece (used for entrances and exits)"));
             put("piece-region", new GameVariableRegion("The region that contains the piece that will be pasted in"));
@@ -47,6 +58,8 @@ public class Dungeons extends SoloGame {
     public void onGameStart(Player player) {
         this.player = player;
         state.put(player, new DungeonState());
+        dungeonRegion = (GameRegion) getVariable("dungeon-region");
+        maxPieceGeneration = (int) getVariable("piece-generation");
         // First, take all the variables coming in and process them, so we can easily calculate info using them.
         processDungeonPieces();
         generateDungeon();
@@ -85,6 +98,7 @@ public class Dungeons extends SoloGame {
         Block block = (Block) getVariable("paste-block");
         Location blockLocation = block.getLocation().clone();
         for (DungeonExit exit : nameToExits.get("start-region")) {
+            exit.setRelativePosition(startPiece.getPieceRegion());
             currentExits.add(new DungeonExitInstance(exit, new PasteAt(blockLocation, 0)));
         }
         startPiece.paste(blockLocation);
@@ -99,7 +113,7 @@ public class Dungeons extends SoloGame {
                 player.teleport(startLocation);
                 endGenerateCountdownTask();
             }
-            player.sendTitle("§bGenerating Map", "§Ready in " + i[0] + "...", 2, 18, 2);
+            player.sendTitle("§b§lGenerating Map", "§eReady in " + i[0] + "...", 2, 18, 2);
             i[0]--;
         }, 0L, 20L);
     }
@@ -110,11 +124,12 @@ public class Dungeons extends SoloGame {
     }
 
     private void generateDungeon() {
+        System.out.println("Generating Dung");
         while (maxPieceGeneration > 0 && currentExits.size() > 0) {
             // Let's use a breadth first search rn
             DungeonExitInstance exitInstance = currentExits.poll();
-            DungeonPiece piece = dungeonPieces.get(0);
-            PasteAt pa = dungeonPieces.get(0).paste(exitInstance);
+            DungeonPiece piece = dungeonPieces.get(rand.nextInt(dungeonPieces.size()));
+            PasteAt pa = piece.paste(exitInstance);
             currentExits.addAll(piece.createExitInstances(pa));
             maxPieceGeneration--;
         }
@@ -137,6 +152,23 @@ public class Dungeons extends SoloGame {
 
     @Override
     public void onGameFinish() {
+        World world = BukkitAdapter.adapt(Objects.requireNonNull(player.getLocation().getWorld()));
+        BlockVector3 min = BlockVector3.at(dungeonRegion.getMin().getBlockX(), dungeonRegion.getMin().getBlockY(), dungeonRegion.getMin().getBlockZ());
+        BlockVector3 max = BlockVector3.at(dungeonRegion.getMax().getBlockX(), dungeonRegion.getMax().getBlockY(), dungeonRegion.getMax().getBlockZ());
+        CuboidRegion selection = new CuboidRegion(world, min, max);
 
+        try (EditSession editSession = WorldEdit.getInstance().newEditSession(world)) {
+            BlockState air = BukkitAdapter.adapt(Material.AIR.createBlockData());
+            editSession.setBlocks(selection, air);
+        } catch (MaxChangedBlocksException e) {
+            e.printStackTrace();
+        }
+        // Reset the state of the game
+        dungeonPieces.clear();
+        deadEnds.clear();
+        currentExits.clear();
+        dungeonRegion = null;
+        player = null;
+        maxPieceGeneration = 0;
     }
 }
