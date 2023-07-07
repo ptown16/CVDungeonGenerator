@@ -1,16 +1,8 @@
 package org.cubeville.cvdungeongenerator.dungeons;
 
-import com.sk89q.worldedit.MaxChangedBlocksException;
-import com.sk89q.worldedit.WorldEdit;
-import com.sk89q.worldedit.bukkit.BukkitAdapter;
-import com.sk89q.worldedit.math.BlockVector3;
-import com.sk89q.worldedit.regions.CuboidRegion;
-import com.sk89q.worldedit.world.World;
-import com.sk89q.worldedit.world.block.BlockState;
-import com.sk89q.worldedit.EditSession;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.cubeville.cvdungeongenerator.CVDungeonGenerator;
@@ -31,7 +23,7 @@ public class Dungeons extends SoloGame {
     private GameRegion dungeonRegion;
     private List<DungeonPiece> dungeonPieces = new ArrayList<>();
     private List<DungeonPiece> deadEnds = new ArrayList<>();
-    private Queue<DungeonExitInstance> currentExits = new LinkedList<>();
+    private Stack<DungeonExitInstance> currentExits = new Stack<>();
 
     public Dungeons(String id, String arenaName) {
         super(id, arenaName);
@@ -113,7 +105,8 @@ public class Dungeons extends SoloGame {
                 player.teleport(startLocation);
                 endGenerateCountdownTask();
             }
-            player.sendTitle("§b§lGenerating Map", "§eReady in " + i[0] + "...", 2, 18, 2);
+            player.sendTitle("§b§lGenerating Map", "§eReady in " + i[0] + "...", 2, 20, 2);
+            player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 1.0F, 1.0F);
             i[0]--;
         }, 0L, 20L);
     }
@@ -126,11 +119,12 @@ public class Dungeons extends SoloGame {
     private void generateDungeon() {
         System.out.println("Generating Dung");
         while (maxPieceGeneration > 0 && currentExits.size() > 0) {
-            // Let's use a breadth first search rn
-            DungeonExitInstance exitInstance = currentExits.poll();
-            DungeonPiece piece = dungeonPieces.get(rand.nextInt(dungeonPieces.size()));
-            PasteAt pa = piece.paste(exitInstance);
-            currentExits.addAll(piece.createExitInstances(pa));
+            // Let's use a depth first search so there's a single long path to the end.
+            DungeonExitInstance exitInstance = currentExits.pop();
+            List<DungeonPiece> pieces = new ArrayList<>(dungeonPieces);
+            Collections.shuffle(pieces);
+            PasteAt pa = pieces.get(0).paste(exitInstance);
+            currentExits.addAll(pieces.get(0).createExitInstances(pa));
             maxPieceGeneration--;
         }
     }
@@ -152,17 +146,7 @@ public class Dungeons extends SoloGame {
 
     @Override
     public void onGameFinish() {
-        World world = BukkitAdapter.adapt(Objects.requireNonNull(player.getLocation().getWorld()));
-        BlockVector3 min = BlockVector3.at(dungeonRegion.getMin().getBlockX(), dungeonRegion.getMin().getBlockY(), dungeonRegion.getMin().getBlockZ());
-        BlockVector3 max = BlockVector3.at(dungeonRegion.getMax().getBlockX(), dungeonRegion.getMax().getBlockY(), dungeonRegion.getMax().getBlockZ());
-        CuboidRegion selection = new CuboidRegion(world, min, max);
-
-        try (EditSession editSession = WorldEdit.getInstance().newEditSession(world)) {
-            BlockState air = BukkitAdapter.adapt(Material.AIR.createBlockData());
-            editSession.setBlocks(selection, air);
-        } catch (MaxChangedBlocksException e) {
-            e.printStackTrace();
-        }
+        WorldEditUtils.setAir(dungeonRegion.getMin(), dungeonRegion.getMax());
         // Reset the state of the game
         dungeonPieces.clear();
         deadEnds.clear();

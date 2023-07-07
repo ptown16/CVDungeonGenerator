@@ -14,13 +14,13 @@ import com.sk89q.worldedit.math.transform.AffineTransform;
 import com.sk89q.worldedit.regions.CuboidRegion;
 import com.sk89q.worldedit.session.ClipboardHolder;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.util.Vector;
 import org.cubeville.cvgames.enums.CardinalDirection;
 import org.cubeville.cvgames.models.GameRegion;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
@@ -43,13 +43,15 @@ public class DungeonPiece {
         this.pieceRegion = pieceRegion;
         Location min = pieceRegion.getMin();
         Location max = pieceRegion.getMax();
+        // Fill out the pieces with structure voids so we can check corners on generation instead of checking all blocks.
+        WorldEditUtils.replace(min, max, Material.AIR, Material.STRUCTURE_VOID);
         this.relativeEntranceMin = entranceRegion != null ? entranceRegion.getMin().toVector().subtract(min.toVector()) : null;
         this.relativeEntranceMax = entranceRegion != null ? entranceRegion.getMax().toVector().subtract(min.toVector()) : null;
         this.entranceDirection = entranceDirection;
         CuboidRegion region = new CuboidRegion(BlockVector3.at(min.getX(), min.getY(), min.getZ()), BlockVector3.at(max.getX(), max.getY(), max.getZ()));
         clipboard = new BlockArrayClipboard(region);
         ForwardExtentCopy forwardExtentCopy = new ForwardExtentCopy(
-                BukkitAdapter.adapt(Objects.requireNonNull(min.getWorld())), region, clipboard, region.getMinimumPoint()
+            BukkitAdapter.adapt(Objects.requireNonNull(min.getWorld())), region, clipboard, region.getMinimumPoint()
         );
         try {
             Operations.complete(forwardExtentCopy);
@@ -80,21 +82,45 @@ public class DungeonPiece {
     }
 
     public PasteAt paste(DungeonExitInstance dei) {
-        if (entranceDirection == null || relativeEntranceMax == null || relativeEntranceMin == null) { return null; }
-        // Move 1 away from where the exit is defined
-        Location pasteLocation = dei.getMin().clone().add(RotationUtils.getExitDirectionOffset(dei.getDirection()));
-        // Find what rotation this piece should be
         int pieceRotation = RotationUtils.getRotationFrom(entranceDirection, dei.getDirection());
         Vector rotatedRelativeMin = RotationUtils.getRotatedRelativeMin(relativeEntranceMin, relativeEntranceMax, pieceRotation);
-        System.out.println("start paste loc " + pasteLocation);
-        System.out.println("rel ent min " + relativeEntranceMin);
-        System.out.println("rel ent max " + relativeEntranceMax);
-        System.out.println("rot rel min " + rotatedRelativeMin);
-        System.out.println("rot " + pieceRotation);
-
-        pasteLocation.subtract(rotatedRelativeMin);
+        Location pasteLocation = dei.getShiftedMinLocation().subtract(rotatedRelativeMin);
         paste(pasteLocation, pieceRotation);
         return new PasteAt(pasteLocation, pieceRotation);
+    }
+
+    public GameRegion getPasteRegion(DungeonExitInstance dei) {
+        int pieceRotation = RotationUtils.getRotationFrom(entranceDirection, dei.getDirection());
+        Vector rotatedRelativeMin = RotationUtils.getRotatedRelativeMin(relativeEntranceMin, relativeEntranceMax, pieceRotation);
+        Location pasteLocation = dei.getShiftedMinLocation().subtract(rotatedRelativeMin);
+        Vector rotationVector = RotationUtils.getRotationVector(pieceRotation);
+        Vector sizeVector = new Vector(getXSize(), getYSize(), getZSize());
+        sizeVector.multiply(rotationVector);
+        return gameRegionFromLocations(pasteLocation, pasteLocation.clone().add(sizeVector));
+    }
+
+    private GameRegion gameRegionFromLocations(Location minY, Location maxY) {
+        // We will already know which Y is min / max since it can never be subtracted
+        Location min = new Location(minY.getWorld(), 0, minY.getY(), 0);
+        Location max = new Location(minY.getWorld(), 0, maxY.getY(), 0);
+
+        if (maxY.getBlockX() > minY.getBlockX()) {
+            min.setX(minY.getBlockX());
+            max.setX(maxY.getBlockX());
+        } else {
+            min.setX(maxY.getBlockX());
+            max.setX(minY.getBlockX());
+        }
+
+        if (maxY.getBlockZ() > minY.getBlockZ()) {
+            min.setZ(minY.getBlockZ());
+            max.setZ(maxY.getBlockZ());
+        } else {
+            min.setZ(maxY.getBlockZ());
+            max.setZ(minY.getBlockZ());
+        }
+
+        return new GameRegion(min, max);
     }
 
     public int getXSize() {

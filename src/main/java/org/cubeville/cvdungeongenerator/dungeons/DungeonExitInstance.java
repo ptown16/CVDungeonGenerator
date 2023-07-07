@@ -21,11 +21,12 @@ public class DungeonExitInstance {
         this.min = pasteAt.location.clone().add(rotatedRelativeMin);
     }
 
-    public Location getMin() {
-        return min;
-    }
-
     public CardinalDirection getDirection() {
         return direction;
+    }
+
+    public Location getShiftedMinLocation() {
+        // Move 1 away from where the exit is defined
+        return min.clone().add(RotationUtils.getExitDirectionOffset(direction));
     }
 }

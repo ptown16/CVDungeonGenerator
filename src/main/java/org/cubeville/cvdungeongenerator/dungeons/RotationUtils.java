@@ -35,6 +35,10 @@ public class RotationUtils {
             270, new Vector(1, 1, -1)
     );
 
+    public static Vector getRotationVector(int rotation) {
+        return rotationVectors.get(rotation);
+    }
+
     public static Vector getExitDirectionOffset(CardinalDirection direction) {
         switch (direction) {
             case NORTH:
@@ -77,7 +81,7 @@ public class RotationUtils {
             swappedMin = new Vector(min.getZ(), min.getY(), min.getX());
             swappedMax = new Vector(max.getZ(), max.getY(), max.getX());
         }
-        Vector adjustmentVector = rotationVectors.get(rotation);
+        Vector adjustmentVector = getRotationVector(rotation);
         Vector rotatedRelativeMin = swappedMin.multiply(adjustmentVector);
         Vector rotatedRelativeMax = swappedMax.multiply(adjustmentVector);
 
