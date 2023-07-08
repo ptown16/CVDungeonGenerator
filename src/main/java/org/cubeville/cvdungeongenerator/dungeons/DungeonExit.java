@@ -1,21 +1,23 @@
 package org.cubeville.cvdungeongenerator.dungeons;
 
+import org.bukkit.Material;
 import org.bukkit.util.Vector;
 import org.cubeville.cvgames.enums.CardinalDirection;
 import org.cubeville.cvgames.models.GameRegion;
 
-import java.util.Map;
-
 public class DungeonExit {
-    GameRegion region;
+
+    private final GameRegion region;
     private Vector relativeMin, relativeMax;
-    private CardinalDirection direction;
+    private final CardinalDirection direction;
+    private final Material fillMaterial;
 
 
 
-    public DungeonExit(GameRegion region, CardinalDirection direction) {
+    public DungeonExit(GameRegion region, CardinalDirection direction, Material fillMaterial) {
         this.region = region;
         this.direction = direction;
+        this.fillMaterial = fillMaterial;
     }
 
     public void setRelativePosition(GameRegion pieceRegion) {
@@ -35,5 +37,10 @@ public class DungeonExit {
         return relativeMax;
     }
 
+    public Vector getSizeVector() { return relativeMax.clone().subtract(relativeMin); }
 
+
+    public Material getFillMaterial() {
+        return fillMaterial;
+    }
 }

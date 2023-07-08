@@ -2,6 +2,7 @@ package org.cubeville.cvdungeongenerator.dungeons;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -18,7 +19,6 @@ public class Dungeons extends SoloGame {
 
     private int generationCountdownTask = -1;
     private int maxPieceGeneration;
-    Random rand = new Random();
     private Player player;
     private GameRegion dungeonRegion;
     private List<DungeonPiece> dungeonPieces = new ArrayList<>();
@@ -43,6 +43,7 @@ public class Dungeons extends SoloGame {
             put("piece-name", new GameVariableString("The name of the dungeon piece this exit belongs to"));
             put("exit-region", new GameVariableRegion("The region that is used to define where the exit is within the piece"));
             put("exit-direction", new GameVariableCardinalDirection("The direction that you are exiting"));
+            put("fill", new GameVariableMaterial("If not used, the fill for this dungeon."));
         }}, "Places you can exit a dungeon piece at");
     }
 
@@ -62,7 +63,11 @@ public class Dungeons extends SoloGame {
         Map<String, List<DungeonExit>> nameToExits = new HashMap<>();
         for (HashMap<String, Object> dungeonExit : (List<HashMap<String, Object>>) getVariable("dungeon-exits")) {
             String pieceName = (String) dungeonExit.get("piece-name");
-            DungeonExit de = new DungeonExit((GameRegion) dungeonExit.get("exit-region"), (CardinalDirection) dungeonExit.get("exit-direction"));
+            DungeonExit de = new DungeonExit(
+                (GameRegion) dungeonExit.get("exit-region"),
+                (CardinalDirection) dungeonExit.get("exit-direction"),
+                (Material) dungeonExit.get("fill")
+            );
             if (nameToExits.containsKey(pieceName)) {
                 nameToExits.get(pieceName).add(de);
             } else {
@@ -117,16 +122,40 @@ public class Dungeons extends SoloGame {
     }
 
     private void generateDungeon() {
-        System.out.println("Generating Dung");
         while (maxPieceGeneration > 0 && currentExits.size() > 0) {
             // Let's use a depth first search so there's a single long path to the end.
             DungeonExitInstance exitInstance = currentExits.pop();
             List<DungeonPiece> pieces = new ArrayList<>(dungeonPieces);
             Collections.shuffle(pieces);
-            PasteAt pa = pieces.get(0).paste(exitInstance);
-            currentExits.addAll(pieces.get(0).createExitInstances(pa));
-            maxPieceGeneration--;
+            DungeonPiece selectedPiece = null;
+            for (DungeonPiece piece : pieces) {
+                GameRegion pasteRegion = piece.getPasteRegion(exitInstance);
+                // If the paste region won't be in the dungeon region, continue to the next piece
+                if (!dungeonRegion.containsLocation(pasteRegion.getMin()) || !dungeonRegion.containsLocation(pasteRegion.getMax())) {
+                    continue;
+                }
+                if (!WorldEditUtils.isRegionEmpty(pasteRegion.getMin(), pasteRegion.getMax())) {
+                    continue;
+                }
+                selectedPiece = piece;
+                break;
+            }
+
+            if (selectedPiece == null) {
+                // We can just fill in the exit with the specified material
+                exitInstance.fill();
+            } else {
+                PasteAt pa = selectedPiece.paste(exitInstance);
+                currentExits.addAll(pieces.get(0).createExitInstances(pa));
+                maxPieceGeneration--;
+            }
         }
+        //TODO -- add the exit to the end of the chain here
+        for (DungeonExitInstance exitInstance : currentExits) {
+            // Fill in the remaining exits so people can't escape >:D
+            exitInstance.fill();
+        }
+        WorldEditUtils.asyncReplace(dungeonRegion.getMin(), dungeonRegion.getMax(), Material.STRUCTURE_VOID, Material.AIR);
     }
 
     @Override
@@ -137,6 +166,7 @@ public class Dungeons extends SoloGame {
     @Override
     public void onPlayerLeave(Player player) {
         endGenerateCountdownTask();
+        finishGame();
     }
 
     @Override
@@ -146,7 +176,7 @@ public class Dungeons extends SoloGame {
 
     @Override
     public void onGameFinish() {
-        WorldEditUtils.setAir(dungeonRegion.getMin(), dungeonRegion.getMax());
+    WorldEditUtils.setAsync(dungeonRegion.getMin(), dungeonRegion.getMax(), Material.AIR);
         // Reset the state of the game
         dungeonPieces.clear();
         deadEnds.clear();

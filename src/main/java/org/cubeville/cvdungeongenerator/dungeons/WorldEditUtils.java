@@ -21,11 +21,11 @@ import java.util.Objects;
 
 public class WorldEditUtils {
 
-    public static void setAir(Location min, Location max) {
+    public static void setAsync(Location min, Location max, Material material) {
         TaskManager.taskManager().async(() -> {
             CuboidRegion selection = getCuboidRegion(min, max);
             try (EditSession editSession = getEditSession(Objects.requireNonNull(min.getWorld()))) {
-                Pattern pattern = new BaseBlock(BukkitAdapter.adapt(Material.AIR.createBlockData()));
+                Pattern pattern = new BaseBlock(BukkitAdapter.adapt(material.createBlockData()));
                 Mask mask = new ExistingBlockMask(editSession.getExtent());
                 editSession.replaceBlocks(selection, mask, pattern);
                 editSession.flushQueue();
@@ -36,17 +36,32 @@ public class WorldEditUtils {
     }
 
     public static void replace(Location min, Location max, Material from, Material to) {
-        TaskManager.taskManager().async(() -> {
-            CuboidRegion selection = getCuboidRegion(min, max);
-            try (EditSession editSession = getEditSession(Objects.requireNonNull(min.getWorld()))) {
-                Pattern pattern = new BaseBlock(BukkitAdapter.adapt(to.createBlockData()));
-                Mask mask = new BlockMask(editSession.getExtent(), new BaseBlock(BukkitAdapter.adapt(from.createBlockData())));
-                editSession.replaceBlocks(selection, mask, pattern);
-                editSession.flushQueue();
-            } catch (MaxChangedBlocksException e) {
-                e.printStackTrace();
-            }
-        });
+        CuboidRegion selection = getCuboidRegion(min, max);
+        try (EditSession editSession = getEditSession(Objects.requireNonNull(min.getWorld()))) {
+            Pattern pattern = new BaseBlock(BukkitAdapter.adapt(to.createBlockData()));
+            Mask mask = new BlockMask(editSession.getExtent(), new BaseBlock(BukkitAdapter.adapt(from.createBlockData())));
+            editSession.replaceBlocks(selection, mask, pattern);
+            editSession.flushQueue();
+        } catch (MaxChangedBlocksException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void asyncReplace(Location min, Location max, Material from, Material to) {
+        TaskManager.taskManager().async(() -> replace(min, max, from, to));
+    }
+
+    public static boolean isRegionEmpty(Location min, Location max) {
+        CuboidRegion selection = getCuboidRegion(min, max);
+        try (EditSession editSession = getEditSession(Objects.requireNonNull(min.getWorld()))) {
+            Mask mask = new BlockMask(editSession.getExtent(), new BaseBlock(BukkitAdapter.adapt(Material.AIR.createBlockData())));
+            boolean isEmpty = editSession.countBlocks(selection, mask.inverse()) == 0;
+            editSession.flushQueue();
+            return isEmpty;
+        } catch (MaxChangedBlocksException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     private static CuboidRegion getCuboidRegion(Location min, Location max) {

@@ -58,6 +58,7 @@ public class DungeonPiece {
         } catch (WorldEditException e) {
             e.printStackTrace();
         }
+        WorldEditUtils.replace(min, max, Material.STRUCTURE_VOID, Material.AIR);
     }
 
     public void paste(Location location) {
