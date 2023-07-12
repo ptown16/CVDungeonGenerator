@@ -12,6 +12,7 @@ import com.sk89q.worldedit.function.mask.Mask;
 import com.sk89q.worldedit.function.pattern.Pattern;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.regions.CuboidRegion;
+import com.sk89q.worldedit.regions.Region;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldedit.world.block.BaseBlock;
 import org.bukkit.Location;
@@ -22,17 +23,18 @@ import java.util.Objects;
 public class WorldEditUtils {
 
     public static void setAsync(Location min, Location max, Material material) {
-        TaskManager.taskManager().async(() -> {
-            CuboidRegion selection = getCuboidRegion(min, max);
-            try (EditSession editSession = getEditSession(Objects.requireNonNull(min.getWorld()))) {
-                Pattern pattern = new BaseBlock(BukkitAdapter.adapt(material.createBlockData()));
-                Mask mask = new ExistingBlockMask(editSession.getExtent());
-                editSession.replaceBlocks(selection, mask, pattern);
-                editSession.flushQueue();
-            } catch (MaxChangedBlocksException e) {
-                e.printStackTrace();
-            }
-        });
+        TaskManager.taskManager().async(() -> set(min, max, material));
+    }
+
+    public static void set(Location min, Location max, Material material) {
+        CuboidRegion selection = getCuboidRegion(min, max);
+        try (EditSession editSession = getEditSession(Objects.requireNonNull(min.getWorld()))) {
+            Pattern pattern = new BaseBlock(BukkitAdapter.adapt(material.createBlockData()));
+            editSession.setBlocks((Region) selection, pattern);
+            editSession.flushQueue();
+        } catch (MaxChangedBlocksException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void replace(Location min, Location max, Material from, Material to) {

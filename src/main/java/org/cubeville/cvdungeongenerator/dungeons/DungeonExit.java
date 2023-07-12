@@ -37,9 +37,6 @@ public class DungeonExit {
         return relativeMax;
     }
 
-    public Vector getSizeVector() { return relativeMax.clone().subtract(relativeMin); }
-
-
     public Material getFillMaterial() {
         return fillMaterial;
     }

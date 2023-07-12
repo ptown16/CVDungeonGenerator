@@ -14,7 +14,6 @@ import com.sk89q.worldedit.math.transform.AffineTransform;
 import com.sk89q.worldedit.regions.CuboidRegion;
 import com.sk89q.worldedit.session.ClipboardHolder;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.util.Vector;
 import org.cubeville.cvgames.enums.CardinalDirection;
 import org.cubeville.cvgames.models.GameRegion;
@@ -29,25 +28,26 @@ public class DungeonPiece {
     private final String name;
     private final Clipboard clipboard;
     private final GameRegion pieceRegion;
+    private final Integer weight;
     private List<DungeonExit> exits = new ArrayList<>();
 
     private final CardinalDirection entranceDirection;
     private final Vector relativeEntranceMin, relativeEntranceMax;
 
     public DungeonPiece(String name, GameRegion gameRegion) {
-        this(name, gameRegion, null, null);
+        this(name, gameRegion, null, null, null);
     }
 
-    public DungeonPiece(String name, GameRegion pieceRegion, @Nullable GameRegion entranceRegion, @Nullable CardinalDirection entranceDirection) {
+    public DungeonPiece(String name, GameRegion pieceRegion, @Nullable GameRegion entranceRegion, @Nullable CardinalDirection entranceDirection, @Nullable Integer weight) {
         this.name = name;
         this.pieceRegion = pieceRegion;
         Location min = pieceRegion.getMin();
         Location max = pieceRegion.getMax();
         // Fill out the pieces with structure voids so we can check corners on generation instead of checking all blocks.
-        WorldEditUtils.replace(min, max, Material.AIR, Material.STRUCTURE_VOID);
         this.relativeEntranceMin = entranceRegion != null ? entranceRegion.getMin().toVector().subtract(min.toVector()) : null;
         this.relativeEntranceMax = entranceRegion != null ? entranceRegion.getMax().toVector().subtract(min.toVector()) : null;
         this.entranceDirection = entranceDirection;
+        this.weight = weight;
         CuboidRegion region = new CuboidRegion(BlockVector3.at(min.getX(), min.getY(), min.getZ()), BlockVector3.at(max.getX(), max.getY(), max.getZ()));
         clipboard = new BlockArrayClipboard(region);
         ForwardExtentCopy forwardExtentCopy = new ForwardExtentCopy(
@@ -58,7 +58,6 @@ public class DungeonPiece {
         } catch (WorldEditException e) {
             e.printStackTrace();
         }
-        WorldEditUtils.replace(min, max, Material.STRUCTURE_VOID, Material.AIR);
     }
 
     public void paste(Location location) {
@@ -66,7 +65,6 @@ public class DungeonPiece {
     }
 
     public void paste(Location location, int rotation) {
-        System.out.println("pasting at " + location + " with rotation " + rotation);
         try (EditSession editSession = WorldEdit.getInstance().newEditSession(BukkitAdapter.adapt(Objects.requireNonNull(location.getWorld())))) {
             ClipboardHolder holder = new ClipboardHolder(clipboard);
             AffineTransform transform = new AffineTransform();
@@ -159,5 +157,9 @@ public class DungeonPiece {
 
     public GameRegion getPieceRegion() {
         return pieceRegion;
+    }
+
+    public Integer getWeight() {
+        return weight;
     }
 }

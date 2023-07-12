@@ -71,7 +71,7 @@ public class RotationUtils {
         return 0;
     }
 
-    public static Vector getRotatedRelativeMin(Vector min, Vector max, int rotation) {
+    public static Vector[] getRotatedRelativeMinMax(Vector min, Vector max, int rotation) {
         Vector swappedMin, swappedMax;
         // at 90 or 270, swap the X and Z values
         if (rotation % 180 == 0) {
@@ -81,17 +81,27 @@ public class RotationUtils {
             swappedMin = new Vector(min.getZ(), min.getY(), min.getX());
             swappedMax = new Vector(max.getZ(), max.getY(), max.getX());
         }
+
         Vector adjustmentVector = getRotationVector(rotation);
         Vector rotatedRelativeMin = swappedMin.multiply(adjustmentVector);
         Vector rotatedRelativeMax = swappedMax.multiply(adjustmentVector);
 
         // Use the lowest of the 2 X and Z values
         if (rotatedRelativeMin.getBlockX() > rotatedRelativeMax.getBlockX()) {
+            int trueMaxX = rotatedRelativeMin.getBlockX();
             rotatedRelativeMin.setX(rotatedRelativeMax.getBlockX());
+            rotatedRelativeMax.setX(trueMaxX);
         }
         if (rotatedRelativeMin.getBlockZ() > rotatedRelativeMax.getBlockZ()) {
+            int trueMaxZ = rotatedRelativeMin.getBlockZ();
             rotatedRelativeMin.setZ(rotatedRelativeMax.getBlockZ());
+            rotatedRelativeMax.setZ(trueMaxZ);
         }
-        return rotatedRelativeMin;
+
+        return new Vector[] { rotatedRelativeMin, rotatedRelativeMax };
+    }
+
+    public static Vector getRotatedRelativeMin(Vector min, Vector max, int rotation) {
+        return getRotatedRelativeMinMax(min, max, rotation)[0];
     }
 }

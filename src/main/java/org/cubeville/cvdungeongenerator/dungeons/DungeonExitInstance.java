@@ -1,7 +1,6 @@
 package org.cubeville.cvdungeongenerator.dungeons;
 
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.util.Vector;
 import org.cubeville.cvgames.enums.CardinalDirection;
 
@@ -15,11 +14,11 @@ public class DungeonExitInstance {
         this.dungeonExit = dungeonExit;
         int pieceRotationPasted = pasteAt.rotation;
 
-        Vector rotatedRelativeMin = RotationUtils.getRotatedRelativeMin(dungeonExit.getRelativeMin(), dungeonExit.getRelativeMax(), pieceRotationPasted);
+        Vector[] rotatedRelativeMinMax = RotationUtils.getRotatedRelativeMinMax(dungeonExit.getRelativeMin(), dungeonExit.getRelativeMax(), pieceRotationPasted);
 
         this.direction = RotationUtils.applyRotationToCardinalDirection(dungeonExit.getDirection(), pieceRotationPasted);
-        this.min = pasteAt.location.clone().add(rotatedRelativeMin);
-        this.max = min.clone().add(dungeonExit.getSizeVector());
+        this.min = pasteAt.location.clone().add(rotatedRelativeMinMax[0]); // add the min offset
+        this.max = pasteAt.location.clone().add(rotatedRelativeMinMax[1]); // add the max offset
     }
 
     public CardinalDirection getDirection() {
@@ -32,6 +31,7 @@ public class DungeonExitInstance {
     }
 
     public void fill() {
-        WorldEditUtils.setAsync(min, max, dungeonExit.getFillMaterial());
+        System.out.println("FILL: " + min + " : " + max);
+        WorldEditUtils.set(min, max, dungeonExit.getFillMaterial());
     }
 }
