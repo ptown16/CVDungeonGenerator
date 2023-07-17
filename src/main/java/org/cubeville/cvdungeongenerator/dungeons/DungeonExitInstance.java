@@ -31,7 +31,6 @@ public class DungeonExitInstance {
     }
 
     public void fill() {
-        System.out.println("FILL: " + min + " : " + max);
         WorldEditUtils.set(min, max, dungeonExit.getFillMaterial());
     }
 }

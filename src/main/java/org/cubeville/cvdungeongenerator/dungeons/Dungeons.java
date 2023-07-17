@@ -26,7 +26,9 @@ public class Dungeons extends SoloGame {
     private final Stack<DungeonExitInstance> currentExits = new Stack<>();
     private Random random;
 
-    private final int DUNGEON_PIECE_BATCH_SIZE = 20;
+    private final int DUNGEON_PIECE_BATCH_SIZE = 10;
+    private final int DUNGEON_PIECE_BATCHES_PER_SECOND = 5;
+
 
     public Dungeons(String id, String arenaName) {
         super(id, arenaName);
@@ -121,7 +123,7 @@ public class Dungeons extends SoloGame {
 
     private void startGenerateCountdownTask(Location startLocation) {
         // IntelliJ made me do this idk why
-        int timeToGenerate = (maxPieceGeneration / (DUNGEON_PIECE_BATCH_SIZE * 2)) + 2;
+        int timeToGenerate = (maxPieceGeneration / (DUNGEON_PIECE_BATCH_SIZE * DUNGEON_PIECE_BATCHES_PER_SECOND)) + 2;
         final int[] i = { timeToGenerate };
         generationCountdownTask = Bukkit.getScheduler().scheduleSyncRepeatingTask(CVDungeonGenerator.getInstance(), () -> {
             if (i[0] == 0) {
@@ -151,22 +153,18 @@ public class Dungeons extends SoloGame {
                 GameRegion pasteRegion = piece.getPasteRegion(exitInstance);
                 // If the paste region won't be in the dungeon region, continue to the next piece
                 if (!dungeonRegion.containsLocation(pasteRegion.getMin()) || !dungeonRegion.containsLocation(pasteRegion.getMax())) {
-                    System.out.println("Stop " + piece.getName() + " from spawning, on the edge!");
                     excluding.add(piece);
                     continue;
                 }
                 if (!WorldEditUtils.isRegionEmpty(pasteRegion.getMin(), pasteRegion.getMax())) {
-                    System.out.println("Stop " + piece.getName() + " from spawning, no space!");
                     excluding.add(piece);
                     continue;
                 }
-                System.out.println("Selected next piece " + piece.getName());
                 selectedPiece = piece;
                 break;
             }
 
             if (selectedPiece == null) {
-                System.out.println("No selected piece ;-;");
                 // We can just fill in the exit with the specified material
                 exitInstance.fill();
             } else {
@@ -175,7 +173,7 @@ public class Dungeons extends SoloGame {
                 maxPieceGeneration--;
                 if (maxPieceGeneration % DUNGEON_PIECE_BATCH_SIZE == 0) {
                     // Continue generating the dungeon after waiting for a bit so we don't overwhelm the system
-                    Bukkit.getScheduler().scheduleSyncDelayedTask(CVDungeonGenerator.getInstance(), this::generateDungeon, 10);
+                    Bukkit.getScheduler().scheduleSyncDelayedTask(CVDungeonGenerator.getInstance(), this::generateDungeon, (20 / DUNGEON_PIECE_BATCHES_PER_SECOND));
                     break;
                 }
             }

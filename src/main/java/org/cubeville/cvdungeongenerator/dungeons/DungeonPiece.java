@@ -93,7 +93,12 @@ public class DungeonPiece {
         Vector rotatedRelativeMin = RotationUtils.getRotatedRelativeMin(relativeEntranceMin, relativeEntranceMax, pieceRotation);
         Location pasteLocation = dei.getShiftedMinLocation().subtract(rotatedRelativeMin);
         Vector rotationVector = RotationUtils.getRotationVector(pieceRotation);
-        Vector sizeVector = new Vector(getXSize(), getYSize(), getZSize());
+        Vector sizeVector;
+        if (pieceRotation % 180 == 0) {
+            sizeVector = new Vector(getXSize(), getYSize(), getZSize());
+        } else {
+            sizeVector = new Vector(getZSize(), getYSize(), getXSize());
+        }
         sizeVector.multiply(rotationVector);
         return gameRegionFromLocations(pasteLocation, pasteLocation.clone().add(sizeVector));
     }
