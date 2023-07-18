@@ -53,6 +53,13 @@ public class Dungeons extends SoloGame {
             put("exit-direction", new GameVariableCardinalDirection("The direction that you are exiting"));
             put("fill", new GameVariableMaterial("If not used, the fill for this dungeon"));
         }}, "Places you can exit a dungeon piece at");
+
+        addGameVariableObjectList("dungeon-spawns", new HashMap(){{
+            put("piece-name", new GameVariableString("The name of the dungeon piece this spawn belongs to"));
+            put("location", new GameVariableLocation("The location within the piece the mob spawns"));
+            put("mob-name", new GameVariableString("The name of the mob you are spawning"));
+            put("level", new GameVariableInt("The level of mob that is spawned in"));
+        }}, "Mob spawns in the dungeon");
     }
 
     @Override
@@ -84,6 +91,21 @@ public class Dungeons extends SoloGame {
             }
         }
 
+        Map<String, List<DungeonSpawn>> nameToSpawns = new HashMap<>();
+        for (HashMap<String, Object> dungeonSpawn : (List<HashMap<String, Object>>) getVariable("dungeon-spawns")) {
+            String pieceName = (String) dungeonSpawn.get("piece-name");
+            DungeonSpawn ds = new DungeonSpawn(
+                    (Location) dungeonSpawn.get("location"),
+                    (String) dungeonSpawn.get("mob-name"),
+                    (Integer) dungeonSpawn.get("level")
+            );
+            if (nameToSpawns.containsKey(pieceName)) {
+                nameToSpawns.get(pieceName).add(ds);
+            } else {
+                nameToSpawns.put(pieceName, new ArrayList<>(){{ add(ds); }});
+            }
+        }
+
         for (HashMap<String, Object> dungeonPiece : (List<HashMap<String, Object>>) getVariable("dungeon-pieces")) {
             Integer weight = (Integer) dungeonPiece.get("weight");
             DungeonPiece dp = new DungeonPiece(
@@ -98,6 +120,9 @@ public class Dungeons extends SoloGame {
                 dp.setExits(nameToExits.get(dp.getName()));
             } else {
                 deadEnds.add(dp);
+            }
+            if (nameToSpawns.containsKey(dp.getName())) {
+                dp.setMobSpawns(nameToSpawns.get(dp.getName()));
             }
         }
 
@@ -235,7 +260,8 @@ public class Dungeons extends SoloGame {
 
     @Override
     public void onGameFinish() {
-    WorldEditUtils.setAsync(dungeonRegion.getMin(), dungeonRegion.getMax(), Material.AIR);
+        WorldEditUtils.setAsync(dungeonRegion.getMin(), dungeonRegion.getMax(), Material.AIR);
+        dungeonPieces.forEach(DungeonPiece::clearActiveMobs);
         // Reset the state of the game
         dungeonPieces.clear();
         deadEnds.clear();

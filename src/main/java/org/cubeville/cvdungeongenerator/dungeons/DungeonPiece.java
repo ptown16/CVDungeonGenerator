@@ -13,6 +13,7 @@ import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.math.transform.AffineTransform;
 import com.sk89q.worldedit.regions.CuboidRegion;
 import com.sk89q.worldedit.session.ClipboardHolder;
+import io.lumine.mythic.core.mobs.ActiveMob;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 import org.cubeville.cvgames.enums.CardinalDirection;
@@ -30,6 +31,8 @@ public class DungeonPiece {
     private final GameRegion pieceRegion;
     private final Integer weight;
     private List<DungeonExit> exits = new ArrayList<>();
+    private List<DungeonSpawn> mobSpawns = new ArrayList<>();
+    private List<ActiveMob> activeMobs = new ArrayList<>();
 
     private final CardinalDirection entranceDirection;
     private final Vector relativeEntranceMin, relativeEntranceMax;
@@ -80,11 +83,19 @@ public class DungeonPiece {
         }
     }
 
+    public void pasteMobs(Location location, int rotation) {
+        for (DungeonSpawn mobSpawn : mobSpawns) {
+            ActiveMob activeMob = mobSpawn.spawn(location, rotation);
+            activeMobs.add(activeMob);
+        }
+    }
+
     public PasteAt paste(DungeonExitInstance dei) {
         int pieceRotation = RotationUtils.getRotationFrom(entranceDirection, dei.getDirection());
         Vector rotatedRelativeMin = RotationUtils.getRotatedRelativeMin(relativeEntranceMin, relativeEntranceMax, pieceRotation);
         Location pasteLocation = dei.getShiftedMinLocation().subtract(rotatedRelativeMin);
         paste(pasteLocation, pieceRotation);
+        pasteMobs(pasteLocation, pieceRotation);
         return new PasteAt(pasteLocation, pieceRotation);
     }
 
@@ -148,6 +159,11 @@ public class DungeonPiece {
         this.exits = exits;
     }
 
+    public void setMobSpawns(List<DungeonSpawn> spawns) {
+        spawns.forEach(spawn -> spawn.setRelativePosition(pieceRegion));
+        this.mobSpawns = spawns;
+    }
+
     public List<DungeonExitInstance> createExitInstances(PasteAt pasteAt) {
         List<DungeonExitInstance> newInstances = new ArrayList<>();
         for (DungeonExit de : exits) {
@@ -166,5 +182,11 @@ public class DungeonPiece {
 
     public Integer getWeight() {
         return weight;
+    }
+
+    public void clearActiveMobs() {
+        for (ActiveMob mob : activeMobs) {
+            mob.despawn();
+        }
     }
 }
