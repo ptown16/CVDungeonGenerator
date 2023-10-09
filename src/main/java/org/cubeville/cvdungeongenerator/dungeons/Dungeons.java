@@ -39,6 +39,8 @@ public class Dungeons extends SoloGame {
         addGameVariable("paste-block", new GameVariableBlock("Places you can exit a dungeon piece from"));
         addGameVariable("dungeon-region", new GameVariableRegion("The region that dungeon generation can happen in"));
         addGameVariable("piece-generation", new GameVariableInt("The number of pieces generated before it caps the rest of them off with dead ends"));
+        addGameVariable("generation-room", new GameVariableRegion("The room the player sits in while the dungeon generates"));
+        addGameVariable("generation-location", new GameVariableLocation("The location the player spawn in the generation room"));
         addGameVariableObjectList("dungeon-pieces", new HashMap(){{
             put("name", new GameVariableString("The name of the dungeon piece (used for entrances and exits)"));
             put("piece-region", new GameVariableRegion("The region that contains the piece that will be pasted in"));
@@ -71,7 +73,6 @@ public class Dungeons extends SoloGame {
         setCurrentRandom();
         // First, take all the variables coming in and process them, so we can easily calculate info using them.
         processDungeonPieces();
-        generateDungeon();
     }
 
     private void processDungeonPieces() {
@@ -134,8 +135,7 @@ public class Dungeons extends SoloGame {
             exit.setRelativePosition(startPiece.getPieceRegion());
             currentExits.add(new DungeonExitInstance(exit, new PasteAt(blockLocation, 0)));
         }
-        startPiece.paste(blockLocation);
-        startGenerateCountdownTask(blockLocation.add(startLocationOffset));
+        startGenerateCountdownTask(startPiece, blockLocation, startLocationOffset);
     }
 
     // Hopefully this means I can reproduce specific dungeon instances and make it easier to find bugs?
@@ -146,19 +146,38 @@ public class Dungeons extends SoloGame {
         Bukkit.getLogger().info("Generating a dungeon with the random seed: " + seed);
     }
 
-    private void startGenerateCountdownTask(Location startLocation) {
+    private void startGenerateCountdownTask(DungeonPiece startPiece, Location blockLocation, Location startLocationOffset) {
         // IntelliJ made me do this idk why
-        int timeToGenerate = (maxPieceGeneration / (DUNGEON_PIECE_BATCH_SIZE * DUNGEON_PIECE_BATCHES_PER_SECOND)) + 2;
+        int timeToGenerate = (maxPieceGeneration / (DUNGEON_PIECE_BATCH_SIZE * DUNGEON_PIECE_BATCHES_PER_SECOND)) + 3;
         final int[] i = { timeToGenerate };
         generationCountdownTask = Bukkit.getScheduler().scheduleSyncRepeatingTask(CVDungeonGenerator.getInstance(), () -> {
+            if (i[0] == timeToGenerate) {
+                WorldEditUtils.setAsync(dungeonRegion.getMin(), dungeonRegion.getMax(), Material.AIR);
+            }
+
+            if (i[0] == timeToGenerate - 1) {
+                createGenerationRoom();
+                startPiece.paste(blockLocation);
+                generateDungeon();
+            }
+
             if (i[0] == 0) {
-                player.teleport(startLocation);
+                player.teleport(blockLocation.add(startLocationOffset));
                 endGenerateCountdownTask();
             }
             player.sendTitle("§b§lGenerating Map", "§eReady in " + i[0] + "...", 2, 20, 2);
             player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 1.0F, 1.0F);
             i[0]--;
         }, 0L, 20L);
+    }
+
+    private void createGenerationRoom() {
+        DungeonPiece generationRoom = new DungeonPiece("generation-room", (GameRegion) getVariable("generation-room"));
+        Location playerLocationOffset = ((Location) getVariable("generation-location")).clone().subtract(generationRoom.getMin());
+        Block block = (Block) getVariable("paste-block");
+        Location blockLocation = block.getLocation().clone().subtract(0, 80, 0);
+        generationRoom.paste(blockLocation);
+        player.teleport(blockLocation.add(playerLocationOffset));
     }
 
     private void endGenerateCountdownTask() {

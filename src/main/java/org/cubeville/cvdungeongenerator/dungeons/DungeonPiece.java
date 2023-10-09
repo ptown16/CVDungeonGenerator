@@ -21,6 +21,7 @@ import org.cubeville.cvgames.models.GameRegion;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -169,6 +170,7 @@ public class DungeonPiece {
         for (DungeonExit de : exits) {
             newInstances.add(new DungeonExitInstance(de, pasteAt));
         }
+        Collections.shuffle(newInstances);
         return newInstances;
     }
 

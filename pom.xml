@@ -4,7 +4,7 @@
     <groupId>org.cubeville</groupId>
     <artifactId>CVDungeonGenerator</artifactId>
     <packaging>jar</packaging>
-    <version>1.18</version>
+    <version>1.20</version>
     <name>CVDungeonGenerator</name>
     <url>http://maven.apache.org</url>
     <properties>
@@ -43,13 +43,13 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.18-R0.1-SNAPSHOT</version>
+            <version>1.20.1-R0.1-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.github.ptown16</groupId>
             <artifactId>CVGames</artifactId>
-            <version>613dfc22be</version>
+            <version>06364c8706</version>
         </dependency>
         <dependency>
             <groupId>io.lumine</groupId>

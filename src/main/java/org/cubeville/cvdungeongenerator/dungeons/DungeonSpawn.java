@@ -18,7 +18,7 @@ import java.util.List;
 public class DungeonSpawn {
 
     Location location;
-    Vector relativePostion;
+    Vector relativePosition;
     MythicMob mob;
     Integer level;
 
@@ -29,16 +29,16 @@ public class DungeonSpawn {
     }
 
     public void setRelativePosition(GameRegion pieceRegion) {
-        relativePostion = location.toVector().subtract(pieceRegion.getMin().toVector());
+        relativePosition = location.toVector().subtract(pieceRegion.getMin().toVector());
     }
 
     public ActiveMob spawn(Location pieceLocation, int pieceRotation) {
         Vector rotationVector = RotationUtils.getRotationVector(pieceRotation);
         Vector relativeVector;
         if (pieceRotation % 180 == 0) {
-            relativeVector = new Vector(relativePostion.getX(), relativePostion.getY(), relativePostion.getZ());
+            relativeVector = new Vector(relativePosition.getX(), relativePosition.getY(), relativePosition.getZ());
         } else {
-            relativeVector = new Vector(relativePostion.getZ(), relativePostion.getY(), relativePostion.getX());
+            relativeVector = new Vector(relativePosition.getZ(), relativePosition.getY(), relativePosition.getX());
         }
         relativeVector.multiply(rotationVector);
         Location mobSpawnLocation = pieceLocation.clone().add(relativeVector);
