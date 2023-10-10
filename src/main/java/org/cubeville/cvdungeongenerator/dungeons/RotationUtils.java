@@ -35,8 +35,20 @@ public class RotationUtils {
             270, new Vector(1, 1, -1)
     );
 
+
     public static Vector getRotationVector(int rotation) {
         return rotationVectors.get(rotation);
+    }
+
+    private static final Map<Integer, Vector> playerMobLocationShift = Map.of(
+            0, new Vector(0, 0, 0),
+            90, new Vector(1, 0, 0),
+            180, new Vector(1, 0, 1),
+            270, new Vector(0, 0, 1)
+    );
+
+    public static Vector getPlayerMobLocationShift(int rotation) {
+        return playerMobLocationShift.get(rotation);
     }
 
     public static Vector getExitDirectionOffset(CardinalDirection direction) {

@@ -14,16 +14,15 @@ import com.sk89q.worldedit.math.transform.AffineTransform;
 import com.sk89q.worldedit.regions.CuboidRegion;
 import com.sk89q.worldedit.session.ClipboardHolder;
 import io.lumine.mythic.core.mobs.ActiveMob;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
+import org.cubeville.cvdungeongenerator.CVDungeonGenerator;
 import org.cubeville.cvgames.enums.CardinalDirection;
 import org.cubeville.cvgames.models.GameRegion;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class DungeonPiece {
 
@@ -33,6 +32,7 @@ public class DungeonPiece {
     private final Integer weight;
     private List<DungeonExit> exits = new ArrayList<>();
     private List<DungeonSpawn> mobSpawns = new ArrayList<>();
+    private List<DungeonContainer> containers = new ArrayList<>();
     private List<ActiveMob> activeMobs = new ArrayList<>();
 
     private final CardinalDirection entranceDirection;
@@ -91,12 +91,19 @@ public class DungeonPiece {
         }
     }
 
+    public void populateContainers(Location location, int rotation) {
+        for (DungeonContainer container : containers) {
+            container.populateContainer(location, rotation);
+        }
+    }
+
     public PasteAt paste(DungeonExitInstance dei) {
         int pieceRotation = RotationUtils.getRotationFrom(entranceDirection, dei.getDirection());
         Vector rotatedRelativeMin = RotationUtils.getRotatedRelativeMin(relativeEntranceMin, relativeEntranceMax, pieceRotation);
         Location pasteLocation = dei.getShiftedMinLocation().subtract(rotatedRelativeMin);
         paste(pasteLocation, pieceRotation);
         pasteMobs(pasteLocation, pieceRotation);
+        populateContainers(pasteLocation, pieceRotation);
         return new PasteAt(pasteLocation, pieceRotation);
     }
 
@@ -165,12 +172,17 @@ public class DungeonPiece {
         this.mobSpawns = spawns;
     }
 
+    public void setContainers(List<DungeonContainer> containers) {
+        containers.forEach(container -> container.setRelativePosition(pieceRegion));
+        this.containers = containers;
+    }
+
     public List<DungeonExitInstance> createExitInstances(PasteAt pasteAt) {
         List<DungeonExitInstance> newInstances = new ArrayList<>();
         for (DungeonExit de : exits) {
             newInstances.add(new DungeonExitInstance(de, pasteAt));
         }
-        Collections.shuffle(newInstances);
+        Collections.shuffle(newInstances, RandomManager.getRandom());
         return newInstances;
     }
 

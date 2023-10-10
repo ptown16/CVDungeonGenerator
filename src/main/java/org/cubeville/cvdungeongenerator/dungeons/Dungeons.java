@@ -24,8 +24,6 @@ public class Dungeons extends SoloGame {
     private final Set<DungeonPiece> dungeonPieces = new HashSet<>();
     private final Set<DungeonPiece> deadEnds = new HashSet<>();
     private final Stack<DungeonExitInstance> currentExits = new Stack<>();
-    private Random random;
-
     private final int DUNGEON_PIECE_BATCH_SIZE = 10;
     private final int DUNGEON_PIECE_BATCHES_PER_SECOND = 5;
 
@@ -41,6 +39,8 @@ public class Dungeons extends SoloGame {
         addGameVariable("piece-generation", new GameVariableInt("The number of pieces generated before it caps the rest of them off with dead ends"));
         addGameVariable("generation-room", new GameVariableRegion("The room the player sits in while the dungeon generates"));
         addGameVariable("generation-location", new GameVariableLocation("The location the player spawn in the generation room"));
+        addGameVariable("loot-slot-chance", new GameVariableDouble("The percentage chance that a specific slot in a container has an item or not"), .3);
+
         addGameVariableObjectList("dungeon-pieces", new HashMap(){{
             put("name", new GameVariableString("The name of the dungeon piece (used for entrances and exits)"));
             put("piece-region", new GameVariableRegion("The region that contains the piece that will be pasted in"));
@@ -62,6 +62,18 @@ public class Dungeons extends SoloGame {
             put("mob-name", new GameVariableString("The name of the mob you are spawning"));
             put("level", new GameVariableInt("The level of mob that is spawned in"));
         }}, "Mob spawns in the dungeon");
+
+        addGameVariableObjectList("dungeon-containers", new HashMap(){{
+            put("piece-name", new GameVariableString("The name of the dungeon piece this container belongs to"));
+            put("location", new GameVariableBlock("The block that a container exists on"));
+        }}, "Dungeon containers");
+
+        addGameVariableObjectList("dungeon-loot-table", new HashMap(){{
+            put("item", new GameVariableItem("The name of the dungeon piece this chest belongs to"));
+//            put("quantity-min", new GameVariableItem("The minimum number of items that spawn when this is selected"));
+//            put("quantity-max", new GameVariableItem("The maximum number of items that spawn when this is selected"));
+            put("weight", new GameVariableInt("The weight of this item being used"));
+        }}, "Dungeon loot table");
     }
 
     @Override
@@ -70,7 +82,7 @@ public class Dungeons extends SoloGame {
         state.put(player, new DungeonState());
         dungeonRegion = (GameRegion) getVariable("dungeon-region");
         maxPieceGeneration = (int) getVariable("piece-generation");
-        setCurrentRandom();
+        RandomManager.setCurrentRandom();
         // First, take all the variables coming in and process them, so we can easily calculate info using them.
         processDungeonPieces();
     }
@@ -107,6 +119,20 @@ public class Dungeons extends SoloGame {
             }
         }
 
+        Map<String, List<DungeonContainer>> nameToContainers = new HashMap<>();
+        for (HashMap<String, Object> dungeonContainer : (List<HashMap<String, Object>>) getVariable("dungeon-containers")) {
+            String pieceName = (String) dungeonContainer.get("piece-name");
+            DungeonContainer dc = new DungeonContainer(
+                    (Block) dungeonContainer.get("location"),
+                    (double) getVariable("loot-slot-chance")
+            );
+            if (nameToContainers.containsKey(pieceName)) {
+                nameToContainers.get(pieceName).add(dc);
+            } else {
+                nameToContainers.put(pieceName, new ArrayList<>(){{ add(dc); }});
+            }
+        }
+
         for (HashMap<String, Object> dungeonPiece : (List<HashMap<String, Object>>) getVariable("dungeon-pieces")) {
             Integer weight = (Integer) dungeonPiece.get("weight");
             DungeonPiece dp = new DungeonPiece(
@@ -125,25 +151,22 @@ public class Dungeons extends SoloGame {
             if (nameToSpawns.containsKey(dp.getName())) {
                 dp.setMobSpawns(nameToSpawns.get(dp.getName()));
             }
+            if (nameToContainers.containsKey(dp.getName())) {
+                dp.setContainers(nameToContainers.get(dp.getName()));
+            }
         }
 
         DungeonPiece startPiece = new DungeonPiece("start-piece", (GameRegion) getVariable("start-piece"));
         Location startLocationOffset = ((Location) getVariable("start-location")).clone().subtract(startPiece.getMin());
         Block block = (Block) getVariable("paste-block");
         Location blockLocation = block.getLocation().clone();
+        blockLocation.setYaw(startLocationOffset.getYaw());
+        blockLocation.setPitch(startLocationOffset.getPitch());
         for (DungeonExit exit : nameToExits.get("start-region")) {
             exit.setRelativePosition(startPiece.getPieceRegion());
             currentExits.add(new DungeonExitInstance(exit, new PasteAt(blockLocation, 0)));
         }
         startGenerateCountdownTask(startPiece, blockLocation, startLocationOffset);
-    }
-
-    // Hopefully this means I can reproduce specific dungeon instances and make it easier to find bugs?
-    private void setCurrentRandom() {
-        random = new Random();
-        long seed = random.nextLong();
-        random.setSeed(seed);
-        Bukkit.getLogger().info("Generating a dungeon with the random seed: " + seed);
     }
 
     private void startGenerateCountdownTask(DungeonPiece startPiece, Location blockLocation, Location startLocationOffset) {
@@ -250,7 +273,7 @@ public class Dungeons extends SoloGame {
             allowedPieces.add(dp);
         }
         if (totalWeight <= 0) { return null; }
-        int randomValue = random.nextInt(totalWeight);
+        int randomValue = RandomManager.getRandom().nextInt(totalWeight);
         int currentWeight = 0;
         for (DungeonPiece dp : allowedPieces) {
             if (randomValue <= currentWeight + dp.getWeight()) {

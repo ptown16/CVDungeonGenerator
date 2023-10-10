@@ -1,5 +1,7 @@
 package org.cubeville.cvdungeongenerator.dungeons;
 
+import io.lumine.mythic.api.MythicPlugin;
+import io.lumine.mythic.api.adapters.AbstractLocation;
 import io.lumine.mythic.api.mobs.MythicMob;
 import io.lumine.mythic.bukkit.MythicBukkit;
 import io.lumine.mythic.core.mobs.ActiveMob;
@@ -42,8 +44,10 @@ public class DungeonSpawn {
         }
         relativeVector.multiply(rotationVector);
         Location mobSpawnLocation = pieceLocation.clone().add(relativeVector);
-        //TODO -- mob spawn direction rotation based on piece loc
+        mobSpawnLocation.add(RotationUtils.getPlayerMobLocationShift(pieceRotation));
+        mobSpawnLocation.setYaw(((location.getYaw() + pieceRotation + 360) % 360));
+        // this kinda works? mythicmobs is not happy but idk what else i can do
         return mob.spawn(BukkitAdapter.adapt(mobSpawnLocation), level);
-    }
+   }
 }
 
