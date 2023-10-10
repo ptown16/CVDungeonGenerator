@@ -6,6 +6,7 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.cubeville.cvdungeongenerator.CVDungeonGenerator;
 import org.cubeville.cvgames.enums.CardinalDirection;
 import org.cubeville.cvgames.models.GameRegion;
@@ -70,8 +71,8 @@ public class Dungeons extends SoloGame {
 
         addGameVariableObjectList("dungeon-loot-table", new HashMap(){{
             put("item", new GameVariableItem("The name of the dungeon piece this chest belongs to"));
-//            put("quantity-min", new GameVariableItem("The minimum number of items that spawn when this is selected"));
-//            put("quantity-max", new GameVariableItem("The maximum number of items that spawn when this is selected"));
+            put("quantity-min", new GameVariableInt("The minimum number of items that spawn when this is selected"));
+            put("quantity-max", new GameVariableInt("The maximum number of items that spawn when this is selected"));
             put("weight", new GameVariableInt("The weight of this item being used"));
         }}, "Dungeon loot table");
     }
@@ -119,12 +120,23 @@ public class Dungeons extends SoloGame {
             }
         }
 
+        DungeonLootTable lootTable = new DungeonLootTable();
+        for (HashMap<String, Object> dungeonLootItem : (List<HashMap<String, Object>>) getVariable("dungeon-loot-table")) {
+            lootTable.addItem(new DungeonLootItemStack(
+                    (ItemStack) dungeonLootItem.get("item"),
+                    (int) dungeonLootItem.get("weight"),
+                    (int) dungeonLootItem.get("quantity-min"),
+                    (int) dungeonLootItem.get("quantity-max")
+            ));
+        }
+
         Map<String, List<DungeonContainer>> nameToContainers = new HashMap<>();
         for (HashMap<String, Object> dungeonContainer : (List<HashMap<String, Object>>) getVariable("dungeon-containers")) {
             String pieceName = (String) dungeonContainer.get("piece-name");
             DungeonContainer dc = new DungeonContainer(
                     (Block) dungeonContainer.get("location"),
-                    (double) getVariable("loot-slot-chance")
+                    (double) getVariable("loot-slot-chance"),
+                    lootTable
             );
             if (nameToContainers.containsKey(pieceName)) {
                 nameToContainers.get(pieceName).add(dc);
@@ -157,6 +169,9 @@ public class Dungeons extends SoloGame {
         }
 
         DungeonPiece startPiece = new DungeonPiece("start-piece", (GameRegion) getVariable("start-piece"));
+        if (nameToContainers.containsKey("start-region")) {
+            startPiece.setContainers(nameToContainers.get("start-region"));
+        }
         Location startLocationOffset = ((Location) getVariable("start-location")).clone().subtract(startPiece.getMin());
         Block block = (Block) getVariable("paste-block");
         Location blockLocation = block.getLocation().clone();
@@ -181,6 +196,7 @@ public class Dungeons extends SoloGame {
             if (i[0] == timeToGenerate - 1) {
                 createGenerationRoom();
                 startPiece.paste(blockLocation);
+                startPiece.populateContainers(blockLocation, 0);
                 generateDungeon();
             }
 

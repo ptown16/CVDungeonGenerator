@@ -19,10 +19,12 @@ public class DungeonContainer {
     Block location;
     Vector relativePosition;
     double lootSlotChance;
+   private final DungeonLootTable lootTable;
 
-    public DungeonContainer(Block location, double lootSlotChance) {
+    public DungeonContainer(Block location, double lootSlotChance, DungeonLootTable lootTable) {
         this.location = location;
         this.lootSlotChance = lootSlotChance;
+        this.lootTable = lootTable;
     }
 
     public void setRelativePosition(GameRegion pieceRegion) {
@@ -47,7 +49,7 @@ public class DungeonContainer {
         Container container = (Container) block.getState();
         for (int i = 0; i < container.getInventory().getSize(); i++) {
             if (RandomManager.getRandom().nextDouble() > lootSlotChance) { continue; }
-            container.getInventory().setItem(i, new ItemStack(Material.APPLE));
+            container.getInventory().setItem(i, lootTable.getRandomItem());
         }
     }
 }
