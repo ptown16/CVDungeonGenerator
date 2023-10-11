@@ -1,11 +1,15 @@
 package org.cubeville.cvdungeongenerator.dungeons;
 
+import io.lumine.mythic.api.mobs.MythicMob;
+import io.lumine.mythic.bukkit.MythicBukkit;
+import io.lumine.mythic.bukkit.events.MythicMobDeathEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
 import org.bukkit.inventory.ItemStack;
 import org.cubeville.cvdungeongenerator.CVDungeonGenerator;
 import org.cubeville.cvgames.enums.CardinalDirection;
@@ -24,6 +28,8 @@ public class Dungeons extends SoloGame {
     private GameRegion dungeonRegion;
     private final Set<DungeonPiece> dungeonPieces = new HashSet<>();
     private final Set<DungeonPiece> deadEnds = new HashSet<>();
+    private DungeonPiece endPiece;
+    private MythicMob finalBoss;
     private final Stack<DungeonExitInstance> currentExits = new Stack<>();
     private final int DUNGEON_PIECE_BATCH_SIZE = 10;
     private final int DUNGEON_PIECE_BATCHES_PER_SECOND = 5;
@@ -33,8 +39,7 @@ public class Dungeons extends SoloGame {
         super(id, arenaName);
         addGameVariable("start-piece", new GameVariableRegion("The piece that a user starts within"));
         addGameVariable("start-location", new GameVariableLocation("The location a player starts at (please set this location on the start piece)"));
-        //TODO -- addGameVariable("end-piece", new GameVariableRegion("The piece that a user starts within"));
-        //TODO -- addGameVariable("end-region", new GameVariableRegion("The location a player gets teleported out of the dungeon at"));
+        addGameVariable("end-boss", new GameVariableString("The mob that the player needs to kill in order to win"));
         addGameVariable("paste-block", new GameVariableBlock("Places you can exit a dungeon piece from"));
         addGameVariable("dungeon-region", new GameVariableRegion("The region that dungeon generation can happen in"));
         addGameVariable("piece-generation", new GameVariableInt("The number of pieces generated before it caps the rest of them off with dead ends"));
@@ -83,6 +88,13 @@ public class Dungeons extends SoloGame {
         state.put(player, new DungeonState());
         dungeonRegion = (GameRegion) getVariable("dungeon-region");
         maxPieceGeneration = (int) getVariable("piece-generation");
+        String finalBossName = (String) getVariable("end-boss");
+        finalBoss = MythicBukkit.inst().getMobManager().getMythicMob(finalBossName).orElse(null);
+        if (finalBoss == null) {
+            player.sendMessage("§cError Generating Dungeon -- Mob with name " + finalBossName + " does not exist! Please report this error to a staff member.");
+            finishGame();
+            return;
+        }
         RandomManager.setCurrentRandom();
         // First, take all the variables coming in and process them, so we can easily calculate info using them.
         processDungeonPieces();
@@ -146,15 +158,18 @@ public class Dungeons extends SoloGame {
         }
 
         for (HashMap<String, Object> dungeonPiece : (List<HashMap<String, Object>>) getVariable("dungeon-pieces")) {
-            Integer weight = (Integer) dungeonPiece.get("weight");
             DungeonPiece dp = new DungeonPiece(
                 (String) dungeonPiece.get("name"),
                 (GameRegion) dungeonPiece.get("piece-region"),
                 (GameRegion) dungeonPiece.get("entrance-region"),
                 (CardinalDirection) dungeonPiece.get("entrance-direction"),
-                weight
+                (Integer) dungeonPiece.get("weight")
              );
-            dungeonPieces.add(dp);
+            if (dp.getName().equals("end-piece")) {
+                endPiece = dp;
+            } else {
+                dungeonPieces.add(dp);
+            }
             if (nameToExits.containsKey(dp.getName())) {
                 dp.setExits(nameToExits.get(dp.getName()));
             } else {
@@ -169,15 +184,15 @@ public class Dungeons extends SoloGame {
         }
 
         DungeonPiece startPiece = new DungeonPiece("start-piece", (GameRegion) getVariable("start-piece"));
-        if (nameToContainers.containsKey("start-region")) {
-            startPiece.setContainers(nameToContainers.get("start-region"));
+        if (nameToContainers.containsKey("start-piece")) {
+            startPiece.setContainers(nameToContainers.get("start-piece"));
         }
         Location startLocationOffset = ((Location) getVariable("start-location")).clone().subtract(startPiece.getMin());
         Block block = (Block) getVariable("paste-block");
         Location blockLocation = block.getLocation().clone();
         blockLocation.setYaw(startLocationOffset.getYaw());
         blockLocation.setPitch(startLocationOffset.getPitch());
-        for (DungeonExit exit : nameToExits.get("start-region")) {
+        for (DungeonExit exit : nameToExits.get("start-piece")) {
             exit.setRelativePosition(startPiece.getPieceRegion());
             currentExits.add(new DungeonExitInstance(exit, new PasteAt(blockLocation, 0)));
         }
@@ -187,13 +202,13 @@ public class Dungeons extends SoloGame {
     private void startGenerateCountdownTask(DungeonPiece startPiece, Location blockLocation, Location startLocationOffset) {
         // IntelliJ made me do this idk why
         int timeToGenerate = (maxPieceGeneration / (DUNGEON_PIECE_BATCH_SIZE * DUNGEON_PIECE_BATCHES_PER_SECOND)) + 3;
-        final int[] i = { timeToGenerate };
+        final int[] i = { (timeToGenerate * 2) };
         generationCountdownTask = Bukkit.getScheduler().scheduleSyncRepeatingTask(CVDungeonGenerator.getInstance(), () -> {
-            if (i[0] == timeToGenerate) {
+            if (i[0] == (timeToGenerate * 2)) {
                 WorldEditUtils.setAsync(dungeonRegion.getMin(), dungeonRegion.getMax(), Material.AIR);
             }
 
-            if (i[0] == timeToGenerate - 1) {
+            if (i[0] == ((timeToGenerate * 2) - 1)) {
                 createGenerationRoom();
                 startPiece.paste(blockLocation);
                 startPiece.populateContainers(blockLocation, 0);
@@ -204,10 +219,13 @@ public class Dungeons extends SoloGame {
                 player.teleport(blockLocation.add(startLocationOffset));
                 endGenerateCountdownTask();
             }
-            player.sendTitle("§b§lGenerating Map", "§eReady in " + i[0] + "...", 2, 20, 2);
-            player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 1.0F, 1.0F);
+
+            if (i[0] % 2 == 0) {
+                player.sendTitle("§b§lGenerating Map", "§eReady in " + (i[0] / 2) + "...", 2, 20, 2);
+                player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 1.0F, 1.0F);
+            }
             i[0]--;
-        }, 0L, 20L);
+        }, 0L, 10L);
     }
 
     private void createGenerationRoom() {
@@ -220,57 +238,93 @@ public class Dungeons extends SoloGame {
     }
 
     private void endGenerateCountdownTask() {
-        Bukkit.getScheduler().cancelTask(generationCountdownTask);
+        if (generationCountdownTask != -1) { Bukkit.getScheduler().cancelTask(generationCountdownTask); }
         generationCountdownTask = -1;
     }
 
     private void generateDungeon() {
-        Set<DungeonPiece> excluding = new HashSet<>();
-        while (maxPieceGeneration > 0 && currentExits.size() > 0) {
-            // Let's use a depth first search so there's a single long path to the end.
-            DungeonExitInstance exitInstance = currentExits.pop();
-            DungeonPiece selectedPiece = null;
-            for (int i = 0; i < dungeonPieces.size(); i++) {
-                DungeonPiece piece = getRandomPiece(excluding);
-                if (piece == null) { break; }
-                GameRegion pasteRegion = piece.getPasteRegion(exitInstance);
-                // If the paste region won't be in the dungeon region, continue to the next piece
-                if (!dungeonRegion.containsLocation(pasteRegion.getMin()) || !dungeonRegion.containsLocation(pasteRegion.getMax())) {
-                    excluding.add(piece);
-                    continue;
-                }
-                if (!WorldEditUtils.isRegionEmpty(pasteRegion.getMin(), pasteRegion.getMax())) {
-                    excluding.add(piece);
-                    continue;
-                }
-                selectedPiece = piece;
+        while (maxPieceGeneration > 1 && currentExits.size() > 0) {
+            runStep();
+
+            if (maxPieceGeneration % DUNGEON_PIECE_BATCH_SIZE == 0) {
+                // Continue generating the dungeon after waiting for a bit so we don't overwhelm the system
+                Bukkit.getScheduler().scheduleSyncDelayedTask(CVDungeonGenerator.getInstance(), this::generateDungeon, (20 / DUNGEON_PIECE_BATCHES_PER_SECOND));
                 break;
             }
+        }
 
-            if (selectedPiece == null) {
-                // We can just fill in the exit with the specified material
-                exitInstance.fill();
-            } else {
-                PasteAt pa = selectedPiece.paste(exitInstance);
-                currentExits.addAll(selectedPiece.createExitInstances(pa));
-                maxPieceGeneration--;
-                if (maxPieceGeneration % DUNGEON_PIECE_BATCH_SIZE == 0) {
-                    // Continue generating the dungeon after waiting for a bit so we don't overwhelm the system
-                    Bukkit.getScheduler().scheduleSyncDelayedTask(CVDungeonGenerator.getInstance(), this::generateDungeon, (20 / DUNGEON_PIECE_BATCHES_PER_SECOND));
-                    break;
-                }
-            }
-            excluding.clear();
+        // If we hit this, the dungeon did not generate fully
+        if (currentExits.size() == 0) {
+            player.sendMessage("§cError Generating Dungeon -- The dungeon cannot generate completely. Please try again, and report to staff if this is happening regularly.");
+            finishGame();
+            return;
         }
 
         // Only do the post dungeon generation stuff if the while loop condition was actually met instead of being broken out of.
-        if (maxPieceGeneration <= 0 || currentExits.size() <= 0) {
+        if (maxPieceGeneration <= 1) {
             afterGenerateDungeon();
         }
     }
 
+    private void runStep() {
+        runStep(null);
+    }
+
+    private void runStep(DungeonPiece requiredPiece) {
+        // Let's use a depth first search so there's a single long path to the end.
+        Set<DungeonPiece> excluding = new HashSet<>();
+        DungeonExitInstance exitInstance = currentExits.pop();
+        DungeonPiece selectedPiece = null;
+        for (int i = 0; i < dungeonPieces.size(); i++) {
+            DungeonPiece piece;
+
+            if (requiredPiece != null) {
+                if (excluding.contains(requiredPiece)) { break; }
+                piece = requiredPiece;
+
+            } else {
+                piece = getRandomPiece(excluding);
+                if (piece == null) { break; }
+            }
+
+            GameRegion pasteRegion = piece.getPasteRegion(exitInstance);
+            // If the paste region won't be in the dungeon region, continue to the next piece
+            if (!dungeonRegion.containsLocation(pasteRegion.getMin()) || !dungeonRegion.containsLocation(pasteRegion.getMax())) {
+                excluding.add(piece);
+                continue;
+            }
+            if (!WorldEditUtils.isRegionEmpty(pasteRegion.getMin(), pasteRegion.getMax())) {
+                excluding.add(piece);
+                continue;
+            }
+            selectedPiece = piece;
+            break;
+        }
+
+        if (selectedPiece == null) {
+            // We can just fill in the exit with the specified material
+            exitInstance.fill();
+        } else {
+            PasteAt pa = selectedPiece.paste(exitInstance);
+            currentExits.addAll(selectedPiece.createExitInstances(pa));
+            maxPieceGeneration--;
+        }
+        excluding.clear();
+    }
+
     private void afterGenerateDungeon() {
-        //TODO -- add the exit to the end of the chain here
+
+        while (maxPieceGeneration > 0 && currentExits.size() > 0) {
+            runStep(endPiece);
+        }
+
+        // If we hit this, the generated dungeon is impossible, and we need to kick the player out
+        if (maxPieceGeneration == 1) {
+            player.sendMessage("§cError Generating Dungeon -- Cannot find a valid location for the end piece. Please try again, and report to staff if this is happening regularly.");
+            finishGame();
+            return;
+        }
+
         for (DungeonExitInstance exitInstance : currentExits) {
             // Fill in the remaining exits so people can't escape >:D
             exitInstance.fill();
@@ -307,7 +361,6 @@ public class Dungeons extends SoloGame {
 
     @Override
     public void onPlayerLeave(Player player) {
-        endGenerateCountdownTask();
         finishGame();
     }
 
@@ -316,9 +369,22 @@ public class Dungeons extends SoloGame {
         return null;
     }
 
+    @EventHandler
+    protected void onMythicMobDeath(MythicMobDeathEvent mde) {
+        if (mde.getMob().getType().equals(finalBoss)) {
+            if (mde.getKiller().equals(player) || mde.getEntity().getLocation().distance(player.getLocation()) < 100) {
+                // THE PLAYER WINS
+                player.sendTitle("§a§lYou Win!", "You defeated the final boss!", 5, 90, 5);
+                //TODO -- do things to reward the player
+                finishGame();
+            }
+        }
+    }
+
+
     @Override
     public void onGameFinish() {
-        WorldEditUtils.setAsync(dungeonRegion.getMin(), dungeonRegion.getMax(), Material.AIR);
+        endGenerateCountdownTask();
         dungeonPieces.forEach(DungeonPiece::clearActiveMobs);
         // Reset the state of the game
         dungeonPieces.clear();
