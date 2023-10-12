@@ -10,6 +10,7 @@ import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.inventory.ItemStack;
 import org.cubeville.cvdungeongenerator.CVDungeonGenerator;
 import org.cubeville.cvgames.enums.CardinalDirection;
@@ -85,6 +86,10 @@ public class Dungeons extends SoloGame {
     @Override
     public void onGameStart(Player player) {
         this.player = player;
+        player.setFireTicks(0);
+        player.getActivePotionEffects().clear();
+        player.setHealth(20);
+        player.setSaturation(20);
         state.put(player, new DungeonState());
         dungeonRegion = (GameRegion) getVariable("dungeon-region");
         maxPieceGeneration = (int) getVariable("piece-generation");
@@ -372,25 +377,43 @@ public class Dungeons extends SoloGame {
     @EventHandler
     protected void onMythicMobDeath(MythicMobDeathEvent mde) {
         if (mde.getMob().getType().equals(finalBoss)) {
-            if (mde.getKiller().equals(player) || mde.getEntity().getLocation().distance(player.getLocation()) < 100) {
+            if ((mde.getKiller() != null && mde.getKiller().equals(player)) || mde.getEntity().getLocation().distance(player.getLocation()) < 100) {
                 // THE PLAYER WINS
-                player.sendTitle("§a§lYou Win!", "You defeated the final boss!", 5, 90, 5);
+                player.sendTitle("§a§lYou Win!", "You survived the dungeon!", 5, 90, 5);
                 //TODO -- do things to reward the player
                 finishGame();
             }
         }
     }
 
+    @EventHandler
+    protected void onPlayerDeath(PlayerDeathEvent deathEvent) {
+        if (deathEvent.getEntity().equals(player)) {
+            // make sure the player drops nothing on death
+            deathEvent.setKeepInventory(true);
+            deathEvent.getDrops().clear();
+            deathEvent.setDroppedExp(0);
+            player.sendTitle("§c§lYou Died!", "You succumbed to the dungeon...", 5, 90, 5);
 
+            finishGame();
+        }
+    }
     @Override
     public void onGameFinish() {
         endGenerateCountdownTask();
         dungeonPieces.forEach(DungeonPiece::clearActiveMobs);
+        endPiece.clearActiveMobs();
         // Reset the state of the game
         dungeonPieces.clear();
         deadEnds.clear();
         currentExits.clear();
         dungeonRegion = null;
+        player.setFireTicks(0);
+        player.getActivePotionEffects().clear();
+        player.setHealth(20);
+        player.setSaturation(20);
+        player.teleport((Location) getVariable("exit"));
+
         player = null;
         maxPieceGeneration = 0;
     }
