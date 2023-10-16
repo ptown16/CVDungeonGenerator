@@ -8,9 +8,13 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.inventory.ItemStack;
 import org.cubeville.cvdungeongenerator.CVDungeonGenerator;
 import org.cubeville.cvgames.enums.CardinalDirection;
@@ -29,11 +33,14 @@ public class Dungeons extends SoloGame {
     private GameRegion dungeonRegion;
     private final Set<DungeonPiece> dungeonPieces = new HashSet<>();
     private final Set<DungeonPiece> deadEnds = new HashSet<>();
+    private final Set<Item> droppedItems = new HashSet<>();
     private DungeonPiece endPiece;
     private MythicMob finalBoss;
     private final Stack<DungeonExitInstance> currentExits = new Stack<>();
     private final int DUNGEON_PIECE_BATCH_SIZE = 10;
     private final int DUNGEON_PIECE_BATCHES_PER_SECOND = 5;
+    private float playerExp;
+    private int playerLevel;
 
 
     public Dungeons(String id, String arenaName) {
@@ -43,6 +50,7 @@ public class Dungeons extends SoloGame {
         addGameVariable("end-boss", new GameVariableString("The mob that the player needs to kill in order to win"));
         addGameVariable("paste-block", new GameVariableBlock("Places you can exit a dungeon piece from"));
         addGameVariable("dungeon-region", new GameVariableRegion("The region that dungeon generation can happen in"));
+        addGameVariable("win-command", new GameVariableString("The command run when the player wins the game"));
         addGameVariable("piece-generation", new GameVariableInt("The number of pieces generated before it caps the rest of them off with dead ends"));
         addGameVariable("generation-room", new GameVariableRegion("The room the player sits in while the dungeon generates"));
         addGameVariable("generation-location", new GameVariableLocation("The location the player spawn in the generation room"));
@@ -90,6 +98,10 @@ public class Dungeons extends SoloGame {
         player.getActivePotionEffects().clear();
         player.setHealth(20);
         player.setSaturation(20);
+        playerExp = player.getExp();
+        playerLevel = player.getLevel();
+        player.setExp(0);
+        player.setLevel(0);
         state.put(player, new DungeonState());
         dungeonRegion = (GameRegion) getVariable("dungeon-region");
         maxPieceGeneration = (int) getVariable("piece-generation");
@@ -376,11 +388,14 @@ public class Dungeons extends SoloGame {
 
     @EventHandler
     protected void onMythicMobDeath(MythicMobDeathEvent mde) {
+        if (player == null) { return; }
         if (mde.getMob().getType().equals(finalBoss)) {
             if ((mde.getKiller() != null && mde.getKiller().equals(player)) || mde.getEntity().getLocation().distance(player.getLocation()) < 100) {
                 // THE PLAYER WINS
                 player.sendTitle("§a§lYou Win!", "You survived the dungeon!", 5, 90, 5);
-                //TODO -- do things to reward the player
+                String winCommand = (String) getVariable("win-command");
+                winCommand = winCommand.replaceAll("%player%", player.getDisplayName());
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), winCommand);
                 finishGame();
             }
         }
@@ -398,6 +413,20 @@ public class Dungeons extends SoloGame {
             finishGame();
         }
     }
+
+    // Prevent the case where someone throws a bunch of stuff on the ground in the spawn room and regenerates
+    @EventHandler
+    protected void onPlayerDropItem(PlayerDropItemEvent dropItemEvent) {
+        if (dropItemEvent.getPlayer().equals(player)) {
+            droppedItems.add(dropItemEvent.getItemDrop());
+        }
+    }
+
+    @EventHandler
+    protected void onItemDespawn(ItemDespawnEvent itemDespawnEvent) {
+        droppedItems.remove(itemDespawnEvent.getEntity());
+    }
+
     @Override
     public void onGameFinish() {
         endGenerateCountdownTask();
@@ -412,7 +441,11 @@ public class Dungeons extends SoloGame {
         player.getActivePotionEffects().clear();
         player.setHealth(20);
         player.setSaturation(20);
+        player.setExp(playerExp);
+        player.setLevel(playerLevel);
         player.teleport((Location) getVariable("exit"));
+        droppedItems.forEach(Entity::remove);
+        droppedItems.clear();
 
         player = null;
         maxPieceGeneration = 0;
